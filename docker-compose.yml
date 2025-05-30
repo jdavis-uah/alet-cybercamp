@@ -1,0 +1,28 @@
+version: '3.8' # Using version 3.8 of Docker Compose file format
+# This Docker Compose file sets up an Ollama service with GPU support
+
+services: 
+  ollama: 
+    image: ollama/ollama:latest
+    container_name: ollama
+    ports:
+      - "11435:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    networks: 
+      - ollama_net 
+    # To enable GPU support, uncomment the following deploy section 
+    # This requires NVIDIA Container Toolkit to be installed on the Docker host 
+    deploy: 
+      resources: 
+        reservations: 
+          devices: 
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    restart: unless-stopped
+volumes: 
+  ollama_data: # Defines the named volume for model persistence 
+networks: 
+  ollama_net: # Defines a custom network for the Ollama service
+    driver: bridge # Using the default bridge driver for simplicity
