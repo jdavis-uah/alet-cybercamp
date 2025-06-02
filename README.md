@@ -14,6 +14,8 @@ _Table of Contents_
     1. Details the process for downloading a LLM from Ollama 
 5. [Running the Web Interface](#running-the-web-interface)
     1. Provides instructions on running the Streamlit application within Docker 
+6. [Tl;dr Running Instructions](#tldr-running-instructions)
+    1. A quickstart to get the project up and running 
 
 ## Utilized Tools 
 - **Docker (required)**
@@ -44,17 +46,25 @@ ollama run gemma3:latest
 
 ## Starting the Docker Containers
 *Docker Desktop must be installed before running the following commands*
-To start the following containers in a "detached state" so that they continue running after the docker command executes, run the following command from the root directory of this repo (the same location as the `docker-compose.yml` file): 
+First you will have to build the docker containers for this workshop. To do so, run the following command from the root directory of the repository (the same location as this README): 
 ```
-docker compose up -d
+docker compose up -d --build
 ```
 
-To verify that Docker pulled the Ollama container properly and that it is running, issue the following command from the terminal: 
+This will start the containers in a "detached state" so that they continue running after the docker command executes and will free up your terminal. 
+
+To verify that Docker pulled the Ollama container properly, built the Streamlit container and that they are running, issue the following commands from the terminal: 
 ```
 docker compose logs ollama 
+docker compose logs streamlit_app
 ```
 
 If you do not see an error in the terminal output, everything is working properly and you can proceed to the next step. 
+
+**Note: to stop the containers if they are running in a detached state, run the following command from the terminal:**
+```
+docker compose down 
+```
 
 ## Downloading a LLM from Ollama 
 In order to work with the Streamlit Web Interface, we need to pull a large language model locally. 
@@ -67,6 +77,15 @@ docker exec ollama ollama pull gemma3:latest
 ```
 
 This will take a few minutes to download most likely. 
+
+### Downloading an Embedding model from Ollama 
+We will also need a separate embedding model for working with the uploaded documents and user prompts. 
+
+We will be using the `nomic-embed-text` model from Ollama for this workshop. To pull this model, run the following command from your terminal: 
+
+```
+docker exec ollama ollama pull nomic-embed-text
+```
 
 ### Running Gemma3
 It is also possible to run Gemma3 from inside the docker container. You simply have to attach to the container and issue the Ollama run command. To do this, run the following commands from the terminal: 
@@ -81,4 +100,17 @@ The first command gives you an interactive terminal in the terminal and runs the
 The second command spins up the Gemma3 model from Ollama and allows you to interact with the model directly using a CLI. 
 
 ## Running the Web Interface 
-I will start on this next. 
+After you have verified the containers have built properly, you can run them again and access the Streamlit app in your browser. 
+
+First, run the docker compose command again (*if the containers aren't already running*):
+```
+docker compose up --build 
+```
+
+You should see the `http://0.0.0.0:8501` in the terminal. Navigate to this link to view the Streamlit application. 
+
+### How to Use the Application
+Will fill out once I'm finished with the app. 
+
+## Tl;dr Running Instructions 
+Just list all of the required commands here for running the entire project. 

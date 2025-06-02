@@ -32,7 +32,7 @@ with st.sidebar:
     # Use the file_uploader widget.
     # "type" restricts the user to upload only specific file types.
     uploaded_file = st.file_uploader(
-        "Choose a log file, text file, or CSV",
+        "Choose a log file (CSV format only for now)",
         type=["csv"]
     )
     

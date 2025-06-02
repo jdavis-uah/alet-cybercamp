@@ -20,6 +20,21 @@ services:
     #           count: all
     #           capabilities: [gpu]
     restart: unless-stopped
+  streamlit_app: 
+    build:  
+      context: . # Assuming a Dockerfile is present in the current directory
+      dockerfile: Dockerfile.streamlit # Specify the Dockerfile to use for building the Streamlit app
+    container_name: streamlit_log_analysis 
+    ports: 
+      - "8501:8501" # Expose Streamlit app on port 8501
+    volumes: 
+      - .:/app # Mount the current directory to /app in the container. Code changes will reload 
+    networks: 
+      - ollama_net # Connect the Streamlit app to the same network as the Ollama service
+    depends_on:
+      - ollama # Ensure Ollama service is started before the Streamlit app
+    environment:
+    - OLLAMA_API_BASE_URL=http://ollama:11434 # Set the Ollama API base URL for the Streamlit app to communicate with Ollama
 volumes: 
   ollama_data: # Defines the named volume for model persistence 
 networks: 
