@@ -35,6 +35,7 @@ services:
       - ollama # Ensure Ollama service is started before the Streamlit app
     environment:
     - OLLAMA_API_BASE_URL=http://ollama:11434 # Set the Ollama API base URL for the Streamlit app to communicate with Ollama
+    - STREAMLIT_SERVER_FILE_WATCHER_TYPE=poll # Use polling for file changes to ensure updates are detected in the Streamlit app
 volumes: 
   ollama_data: # Defines the named volume for model persistence 
 networks: 
