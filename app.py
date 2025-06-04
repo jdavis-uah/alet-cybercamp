@@ -26,6 +26,7 @@ st.set_page_config(
 LLM_MODEL_NAME = "gemma3:latest"
 # LLM_MODEL_NAME = "tinyllama"
 EMBEDDING_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"  # Local HuggingFace model for embeddings
+PROCESSING_ROW_LIMIT = None # Limit the number of rows to read from the CSV. Set to None to read all rows
 
 # --- Application Title ---
 st.title(f"Local Log Analyzer with {LLM_MODEL_NAME.upper()}")
@@ -112,14 +113,18 @@ with st.sidebar:
     # "type" restricts the user to upload only specific file types.
     uploaded_file_obj = st.file_uploader(
         "Choose a CSV log file",
-        type=["csv"]
+        type=["csv"], 
+        key="file_uploader_widget"
     )
 
     if uploaded_file_obj: 
-        new_file_uploaded = (st.session_state.uploaded_file_name != uploaded_file_obj.name)
-        print(f"New file upload: {new_file_uploaded}")
+        new_file_uploaded = st.session_state.uploaded_file_name != uploaded_file_obj.name
+    
         if new_file_uploaded: 
-            print("File changed")
+            # Clear the cache resource so that we trigger the recomputation of embeddings on file change
+            st.cache_resource.clear()
+
+            # Set the session state variables accordingly
             st.session_state.uploaded_file_name = uploaded_file_obj.name 
             st.session_state.messages = [] # Reset chat messages on new file upload
             st.session_state.chat_engine = None # Reset chat engine on new file upload
@@ -128,12 +133,11 @@ with st.sidebar:
             with st.spinner("Processing uploaded log file..."): 
                 try: 
                     st.session_state.df = pd.read_csv(uploaded_file_obj, 
-                                                      # nrows=100
+                                                      nrows=PROCESSING_ROW_LIMIT
                                                       )
                     st.success(f"File '{uploaded_file_obj.name}' uploaded successfully!")
 
                     # Initialize LlamaIndex and chat engine after the df is loaded 
-                    # Pass df and filename to ensure cache invalidation on new file upload 
                     st.session_state.chat_engine = initialize_llama_index(st.session_state.df.copy(), uploaded_file_obj.name)
 
                 except Exception as e: 
@@ -156,7 +160,7 @@ else:
     # This is where the main logic for LlamaIndex and chat will go.
     # For now, we'll just display the name of the file and the header. 
         # --- Display a preview of the DataFrame ---
-    st.header("CSV Preview (First 10 Rows)")
+    st.header(f"{st.session_state.uploaded_file_name} Preview (First 10 Rows)")
     st.dataframe(st.session_state.df.head(10))
     
     st.divider()
@@ -169,7 +173,7 @@ else:
             st.markdown(message["content"])
 
     # Chat input 
-    if prompt := st.chat_input("Ask a question about your file..."):
+    if prompt := st.chat_input(f"Ask a question about {st.session_state.uploaded_file_name}..."):
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"): 
             st.markdown(prompt)
