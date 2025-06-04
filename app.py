@@ -2,11 +2,16 @@ import pandas as pd
 import streamlit as st 
 import io 
 import os 
+import torch 
 
-# LlamaIndex imports 
+# LlamaIndex imports.
 from llama_index.core import Document, VectorStoreIndex, Settings
 from llama_index.llms.ollama import Ollama
 from llama_index.embeddings.ollama import OllamaEmbedding
+from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+
+if hasattr(torch, 'classes'):
+    torch.classes.__path__ = []
 
 # --- Page Configuration ---
 # Set the page title and a relevant icon. The layout "wide" is good for apps that display a lot of data.
@@ -17,7 +22,9 @@ st.set_page_config(
 
 # --- Constants for LLM and Embedding Model ---
 LLM_MODEL_NAME = "gemma3:latest"
-EMBEDDING_MODEL_NAME = "nomic-embed-text"
+# LLM_MODEL_NAME = "tinyllama"
+# LOCAL_EMBEDDING_MODEL_NAME = "nomic-embed-text"
+LOCAL_EMBEDDING_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"  # Local HuggingFace model for embeddings
 
 # --- Application Title ---
 st.title("Local Log Analyzer with Gemma 3")
@@ -51,42 +58,52 @@ def initialize_llama_index(_df: pd.DataFrame, _uploaded_file_name_for_cache_key:
         # As such, we will use 11435 as the default 
         ollama_base_url = os.getenv("OLLAMA_API_BASE_URL", "http://localhost:11435")
         st.write(f'Connecting to Ollama at {ollama_base_url}...')
-        st.write(f'Using LLM: {LLM_MODEL_NAME} and Embedding Model: {EMBEDDING_MODEL_NAME}')
+        # st.write(f'Using LLM: {LLM_MODEL_NAME} and Embedding Model: {EMBEDDING_MODEL_NAME}')
+        st.write(f'Using LLM: {LLM_MODEL_NAME} and Embedding Model: {LOCAL_EMBEDDING_MODEL_NAME}')
 
         # Initialize the LLM and Embedding Model from Ollama 
         llm = Ollama(model=LLM_MODEL_NAME, base_url=ollama_base_url, request_timeout=120)
-        embed_model = OllamaEmbedding(model_name=EMBEDDING_MODEL_NAME, 
-                                      base_url=ollama_base_url, 
-                                      embed_batch_size=64)
+        # embed_model = OllamaEmbedding(model_name=LOCAL_EMBEDDING_MODEL_NAME, 
+        #                               base_url=ollama_base_url, 
+        #                               embed_batch_size=64)
+        embed_model = HuggingFaceEmbedding(model_name=LOCAL_EMBEDDING_MODEL_NAME, 
+                                           embed_batch_size=64)
 
         # Configure the LlamaIndex global settings 
         Settings.llm = llm
         Settings.embed_model = embed_model
-        # Settings.chunk_size = 512  # Set chunk size for document processing
-        # Settings.chunk_overlap = 50  # Set chunk overlap for document processing
+        Settings.chunk_size = 1024  # Set chunk size for document processing
+        Settings.chunk_overlap = 50  # Set chunk overlap for document processing
 
         # Convert the DataFrame rows to LlamaIndex Documents
-        docs = [] 
-        for i, row in _df.astype(str).iterrows():
-          # Create a text representation of each row 
-          row_text = ", ".join([f"{col}: {val}" for col, val in row.items()])
-          docs.append(Document(text=f"Row {i}: {row_text}")) # Add row index for context
+        all_rows_text_parts = []
+        for i, row in _df.astype(str).iterrows(): 
+            row_text = ", ".join([f"{col}: {val}" for col, val in row.items()])
+            all_rows_text_parts.append(f"Row {i}: {row_text}")
 
-        if not docs: 
-            st.warning("The CSV file seems empty or could not be processed into documents.")
-            return None 
+        full_document_text = "\n\n".join(all_rows_text_parts)
         
-        st.write(f"Created {len(docs)} documents from the uploaded CSV file for embedding.")
+        if not full_document_text.strip():
+            st.warning("The CSV data resulted in empty text and could not be processed.")
+            return None
+        
+        # Create one single LlamaIndex Document from the consolidated text
+        docs = [Document(text=full_document_text, doc_id=f"{_uploaded_file_name_for_cache_key}")]
+
+        st.write(f"Created 1 consolidated document from {len(_df)} CSV rows.")
+        st.write(f"Document length: {len(full_document_text)} characters.")
+        st.write("LlamaIndex will now chunk this document internally and embed those chunks.")
+        st.write(f"Note: Ollama's API embeds one text chunk per call. The number of API calls will depend on how many chunks LlamaIndex creates based on chunk_size ({Settings.chunk_size}).")
+
         # Create a VectorStoreIndex from the documents in memory 
-        index = VectorStoreIndex.from_documents(docs, show_progress=True)
+        index = VectorStoreIndex.from_documents(docs, show_progress=True, use_async=False)
 
         # Create the chat engine 
         # "condense_plus_context" is good for maintaining conversational context with RAG 
         chat_engine = index.as_chat_engine(
-            chat_mode="condense_plus_context",
+            chat_mode="condense_plus_context", # type: ignore
             verbose=True
         )
-        st.success("LlamaIndex chat engine initialized successfully!")
         return chat_engine
     except Exception as e:
         st.error(f"Error initializing LlamaIndex: {e}")
