@@ -1,13 +1,45 @@
+# ----BUILDER STAGE----
+FROM python:3.12-slim as builder 
+
+# Create a venv in a standard location 
+RUN python -m venv /opt/venv 
+
+# Activate venv for subsequent RUN commands in this stage by setting PATH 
+# This ensures pip and pyton commands use the venv 
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Explicitly install CPU-only PYTorch and related libraries into the venv first 
+# When working with uv, this always defaulted to installing the Linux version with the additional NVIDIA libraries 
+# even though they weren't used. As a workaround, defaulting to pip installing Torch manually 
+RUN pip install torch --extra-index-url https://download.pytorch.org/whl/cpu
+
+# Set the working directory for copying project files 
+WORKDIR /app 
+
+# Copy the pyproject.toml file that contains the remaining dependencies 
+COPY pyproject.toml ./ 
+
+# Install remaining dependencies 
+RUN pip install . 
+
+# ----- FINAL STAGE -----
+# Start again with a clean Python image 
 FROM python:3.12-slim 
 
 WORKDIR /app 
 
+# Copy the venv from the builder stage.
+# This should copy only the installed packages and not the large wheel or file caches 
+COPY --from=builder /opt/venv /opt/venv 
+
+# Copy the application's source code 
 COPY app.py . 
-COPY pyproject.toml . 
 
-RUN pip install torch --extra-index-url https://download.pytorch.org/whl/cpu
-RUN pip install . 
+# Activate the venv by setting the PATH
+ENV PATH="/opt/venv/bin:$PATH"
 
+# Expose the port Streamlit runs on 
 EXPOSE 8501 
 
+# Define the command to run the Streamlit application
 CMD ["streamlit", "run", "app.py", "--server.port=8501", "--server.address=0.0.0.0"]

@@ -7,10 +7,10 @@ import torch
 # LlamaIndex imports.
 from llama_index.core import Document, VectorStoreIndex, Settings
 from llama_index.llms.ollama import Ollama
-from llama_index.embeddings.ollama import OllamaEmbedding
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 
 if hasattr(torch, 'classes'):
+    # Known issue with torch and streamlit. This is a bypass for the error. 
     torch.classes.__path__ = []
 
 # --- Page Configuration ---
@@ -20,15 +20,16 @@ st.set_page_config(
     layout="wide"
 )
 
+# TODO: ADD THESE TO A FILE. WILL RELOAD ON EVERY RUN 
+
 # --- Constants for LLM and Embedding Model ---
 LLM_MODEL_NAME = "gemma3:latest"
 # LLM_MODEL_NAME = "tinyllama"
-# LOCAL_EMBEDDING_MODEL_NAME = "nomic-embed-text"
-LOCAL_EMBEDDING_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"  # Local HuggingFace model for embeddings
+EMBEDDING_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"  # Local HuggingFace model for embeddings
 
 # --- Application Title ---
-st.title("Local Log Analyzer with Gemma 3")
-st.write("Upload your log or CSV file, and then ask questions about it!")
+st.title(f"Local Log Analyzer with {LLM_MODEL_NAME.upper()}")
+st.write("Upload your log CSV file, and then ask questions about it!")
 
 # --- Session State Initialization ---
 # This is crucial for keeping data persistent across user interactions (re-runs).
@@ -57,16 +58,13 @@ def initialize_llama_index(_df: pd.DataFrame, _uploaded_file_name_for_cache_key:
         # The port is mapped to 11435 on the docker container to not conflict with the Ollama CLI locally
         # As such, we will use 11435 as the default 
         ollama_base_url = os.getenv("OLLAMA_API_BASE_URL", "http://localhost:11435")
-        st.write(f'Connecting to Ollama at {ollama_base_url}...')
+        st.write(f'Connecting to Ollama at {ollama_base_url}')
         # st.write(f'Using LLM: {LLM_MODEL_NAME} and Embedding Model: {EMBEDDING_MODEL_NAME}')
-        st.write(f'Using LLM: {LLM_MODEL_NAME} and Embedding Model: {LOCAL_EMBEDDING_MODEL_NAME}')
+        st.write(f'Using LLM: {LLM_MODEL_NAME} and Embedding Model: {EMBEDDING_MODEL_NAME}')
 
         # Initialize the LLM and Embedding Model from Ollama 
         llm = Ollama(model=LLM_MODEL_NAME, base_url=ollama_base_url, request_timeout=120)
-        # embed_model = OllamaEmbedding(model_name=LOCAL_EMBEDDING_MODEL_NAME, 
-        #                               base_url=ollama_base_url, 
-        #                               embed_batch_size=64)
-        embed_model = HuggingFaceEmbedding(model_name=LOCAL_EMBEDDING_MODEL_NAME, 
+        embed_model = HuggingFaceEmbedding(model_name=EMBEDDING_MODEL_NAME, 
                                            embed_batch_size=64)
 
         # Configure the LlamaIndex global settings 
@@ -75,28 +73,22 @@ def initialize_llama_index(_df: pd.DataFrame, _uploaded_file_name_for_cache_key:
         Settings.chunk_size = 1024  # Set chunk size for document processing
         Settings.chunk_overlap = 50  # Set chunk overlap for document processing
 
-        # Convert the DataFrame rows to LlamaIndex Documents
-        all_rows_text_parts = []
+        docs = [] 
         for i, row in _df.astype(str).iterrows(): 
             row_text = ", ".join([f"{col}: {val}" for col, val in row.items()])
-            all_rows_text_parts.append(f"Row {i}: {row_text}")
+            doc_id = f"{_uploaded_file_name_for_cache_key}_row_{i}"
+            docs.append(Document(text=f"Row {i}: {row_text}", doc_id=doc_id))
 
-        full_document_text = "\n\n".join(all_rows_text_parts)
-        
-        if not full_document_text.strip():
-            st.warning("The CSV data resulted in empty text and could not be processed.")
-            return None
-        
-        # Create one single LlamaIndex Document from the consolidated text
-        docs = [Document(text=full_document_text, doc_id=f"{_uploaded_file_name_for_cache_key}")]
+        if not docs: 
+            st.warning("The CSV data resulted in no documents to process")
+            return None 
 
-        st.write(f"Created 1 consolidated document from {len(_df)} CSV rows.")
-        st.write(f"Document length: {len(full_document_text)} characters.")
-        st.write("LlamaIndex will now chunk this document internally and embed those chunks.")
-        st.write(f"Note: Ollama's API embeds one text chunk per call. The number of API calls will depend on how many chunks LlamaIndex creates based on chunk_size ({Settings.chunk_size}).")
+        st.write(f"Created {len(docs)} documents")
+        st.write(f"Creating document embeddings...")
 
         # Create a VectorStoreIndex from the documents in memory 
         index = VectorStoreIndex.from_documents(docs, show_progress=True, use_async=False)
+        st.write("Finished creating document embeddings. Initializing chat engine.")
 
         # Create the chat engine 
         # "condense_plus_context" is good for maintaining conversational context with RAG 
@@ -104,6 +96,7 @@ def initialize_llama_index(_df: pd.DataFrame, _uploaded_file_name_for_cache_key:
             chat_mode="condense_plus_context", # type: ignore
             verbose=True
         )
+        st.write("Chat engine initialized")
         return chat_engine
     except Exception as e:
         st.error(f"Error initializing LlamaIndex: {e}")
@@ -124,7 +117,9 @@ with st.sidebar:
 
     if uploaded_file_obj: 
         new_file_uploaded = (st.session_state.uploaded_file_name != uploaded_file_obj.name)
+        print(f"New file upload: {new_file_uploaded}")
         if new_file_uploaded: 
+            print("File changed")
             st.session_state.uploaded_file_name = uploaded_file_obj.name 
             st.session_state.messages = [] # Reset chat messages on new file upload
             st.session_state.chat_engine = None # Reset chat engine on new file upload
@@ -132,7 +127,9 @@ with st.sidebar:
 
             with st.spinner("Processing uploaded log file..."): 
                 try: 
-                    st.session_state.df = pd.read_csv(uploaded_file_obj, nrows=100)
+                    st.session_state.df = pd.read_csv(uploaded_file_obj, 
+                                                      # nrows=100
+                                                      )
                     st.success(f"File '{uploaded_file_obj.name}' uploaded successfully!")
 
                     # Initialize LlamaIndex and chat engine after the df is loaded 
