@@ -32,8 +32,9 @@ WORKDIR /app
 # This should copy only the installed packages and not the large wheel or file caches 
 COPY --from=builder /opt/venv /opt/venv 
 
-# Copy the application's source code 
+# Copy the application's source code and configuration file
 COPY app.py . 
+COPY config.toml . 
 
 # Activate the venv by setting the PATH
 ENV PATH="/opt/venv/bin:$PATH"

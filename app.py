@@ -1,8 +1,8 @@
 import pandas as pd 
-import streamlit as st 
-import io 
+import streamlit as st  
 import os 
 import torch 
+import tomllib
 
 # LlamaIndex imports.
 from llama_index.core import Document, VectorStoreIndex, Settings
@@ -20,13 +20,30 @@ st.set_page_config(
     layout="wide"
 )
 
-# TODO: ADD THESE TO A FILE. WILL RELOAD ON EVERY RUN 
-
-# --- Constants for LLM and Embedding Model ---
-LLM_MODEL_NAME = "gemma3:latest"
-# LLM_MODEL_NAME = "tinyllama"
+# --- Constant for Embedding Model. This is likely never to change so not included in config.toml ---
 EMBEDDING_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"  # Local HuggingFace model for embeddings
-PROCESSING_ROW_LIMIT = None # Limit the number of rows to read from the CSV. Set to None to read all rows
+
+# ---Defaults for configuration loading ---
+DEFAULT_LLM_MODEL_NAME = "tinyllama"
+DEFAULT_PROCESSING_ROW_LIMIT = None # Process all rows by default if not specified
+
+config = {}
+try:
+    with open("config.toml", "rb") as f:
+        config = tomllib.load(f)
+    print("[INFO] Loaded configuration from config.toml")
+except FileNotFoundError:
+    print("[INFO] config.toml not found, using default settings.")
+except tomllib.TOMLDecodeError:
+    print("[ERROR] Error decoding config.toml, using default settings.")
+
+LLM_MODEL_NAME = config.get("LLM_MODEL_NAME", DEFAULT_LLM_MODEL_NAME)
+PROCESSING_ROW_LIMIT_CONFIG = config.get("PROCESSING_ROW_LIMIT", DEFAULT_PROCESSING_ROW_LIMIT)
+if isinstance(PROCESSING_ROW_LIMIT_CONFIG, int) and PROCESSING_ROW_LIMIT_CONFIG > 0: 
+    PROCESSING_ROW_LIMIT = PROCESSING_ROW_LIMIT_CONFIG
+else: 
+    PROCESSING_ROW_LIMIT = DEFAULT_PROCESSING_ROW_LIMIT
+
 
 # --- Application Title ---
 st.title(f"Local Log Analyzer with {LLM_MODEL_NAME.upper()}")

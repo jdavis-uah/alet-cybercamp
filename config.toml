@@ -1,0 +1,6 @@
+# You can set this to any model that you downloaded from Ollama 
+# Gemma3 is the open source Gemini model. "tinyllama" is a great option for resource constrained systems as well. 
+LLM_MODEL_NAME = "gemma3:latest" 
+
+# Change this value to limit the number of rows read in for processing. A value of -1 will read all rows. 
+PROCESSING_ROW_LIMIT = -1
