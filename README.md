@@ -71,6 +71,8 @@ In order to work with the Streamlit Web Interface, we need to pull a large langu
 
 For this workshop, we will be using the open-sourced Gemma3 model from Google. This model is fairly lightweight, only around 3.5GB. For comparison the latest, smallest, Llama 4 model (Llama4 Scout) is 65GB. It is likely that Llama 4 will give more accurate outputs but for the purpose of this workshop we will use the smaller model with less parameters. 
 
+**Note: Be sure your containers are running by executing `docker compose up -d --build` again in the terminal if you stopped them after checking the logs**
+
 To pull Gemma3 from Ollama so that we can work with it locally, issue the following command from the terminal: 
 ```
 docker exec ollama ollama pull gemma3:latest
@@ -78,13 +80,9 @@ docker exec ollama ollama pull gemma3:latest
 
 This will take a few minutes to download most likely. 
 
-### Downloading an Embedding model from Ollama 
-We will also need a separate embedding model for working with the uploaded documents and user prompts. 
-
-We will be using the `nomic-embed-text` model from Ollama for this workshop. To pull this model, run the following command from your terminal: 
-
+We can also experiment with a much more lightweight model, TinyLlama. This model is designed to fit on less powerful devices and requires less compute. As a tradeoff, it is more prone to generate erroneous responses. To download the TinyLlama model, run the folling command from the terminal: 
 ```
-docker exec ollama ollama pull nomic-embed-text
+docker exec ollama ollama pull tinyllama
 ```
 
 ### Running Gemma3
@@ -102,15 +100,51 @@ The second command spins up the Gemma3 model from Ollama and allows you to inter
 ## Running the Web Interface 
 After you have verified the containers have built properly, you can run them again and access the Streamlit app in your browser. 
 
-First, run the docker compose command again (*if the containers aren't already running*):
+First, run the following commands to start the containers without detaching. This will allow us to inspect the output from the Docker containers in the terminal.
 ```
-docker compose up --build 
+docker compose down 
+docker compose up
 ```
+
+Running this command without the `-d` flag keeps the shell open to the docker containers. 
 
 You should see the `http://0.0.0.0:8501` in the terminal. Navigate to this link to view the Streamlit application. 
 
+**Note: On Windows systems, `http://0.0.0.0:8501` may not resolve. If you encourter this issue, navigate to `http://localhost:8501` instead.**
+
 ### How to Use the Application
-Will fill out once I'm finished with the app. 
+First, you will need to upload a CSV file using the web application file loader. 
+
+On upload, the application will embed the contained information. This is a computationally intensive process and may take some time. You can see the progress of the embeddings in the terminal output window. 
+
+After the embeddings are computed, an LLM chat engine will be constructed for the uploaded file. You can now begin asking questions about the file and inspect the LLM responses. 
+
+### Changing the LLM Used 
+By default, the application uses the Gemma3 model for LLM processing. If you are unable to run this model due to performance, open the `config.toml` file and change the `LLM_MODEL_NAME` variable from `"gemma3:latest"` to `"tinyllama"`. 
+
+You will have to rebuild and restart the application after making this change. You can do this by issuing the following commands in the terminal: 
+```
+docker compose down 
+docker compose up --build 
+```
+
+### Changing the Number oF CSV Rows Processed 
+By default, the application will process all of the rows contained in your CSV file. If you need to limit the number of rows being processed for performance reasons, open the `config.toml` file and find the `PROCESSING_ROW_LIMIT` variable. Setting the value of this variable to any number greater than 0 will instruct the application to only read that number of rows from the uploaded CSV file. I.e. `PROCESSING_ROW_LIMIT=100` will only read the first 100 rows from the uploaded CSV file. 
+
+To reflect this change, you will have to rebuild and restart the application with the following commands in the terminal: 
+```
+docker compose down 
+docker compose up --build 
+```
 
 ## Tl;dr Running Instructions 
-Just list all of the required commands here for running the entire project. 
+Assuming you have installed Docker Desktop, you can run the following commands to lauch the application. 
+- `docker compose up -d --build`
+- `docker exec ollama ollama pull gemma3:latest`
+    - This will download the Gemma3 open source Gemini model 
+- `docker exec ollama ollama pull tinyllama`
+    - This will download a smaller model you can experiment with 
+- `docker compose down`
+- `docker compose up` 
+- Navigate to `http://localhost:8501` in your browser
+- Upload a CSV file and begin having a conversation with your document 
