@@ -6,6 +6,7 @@ import tomllib
 
 # LlamaIndex imports.
 from llama_index.core import Document, VectorStoreIndex, Settings
+from llama_index.core.chat_engine import CondensePlusContextChatEngine
 from llama_index.llms.ollama import Ollama
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 
@@ -26,6 +27,7 @@ EMBEDDING_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"  # Local Hugging
 # ---Defaults for configuration loading ---
 DEFAULT_LLM_MODEL_NAME = "tinyllama"
 DEFAULT_PROCESSING_ROW_LIMIT = None # Process all rows by default if not specified
+DEFAULT_SIMILAR_DOCUMENTS_LIMIT = 5
 
 config = {}
 try:
@@ -38,16 +40,25 @@ except tomllib.TOMLDecodeError:
     print("[ERROR] Error decoding config.toml, using default settings.")
 
 LLM_MODEL_NAME = config.get("LLM_MODEL_NAME", DEFAULT_LLM_MODEL_NAME)
+
 PROCESSING_ROW_LIMIT_CONFIG = config.get("PROCESSING_ROW_LIMIT", DEFAULT_PROCESSING_ROW_LIMIT)
 if isinstance(PROCESSING_ROW_LIMIT_CONFIG, int) and PROCESSING_ROW_LIMIT_CONFIG > 0: 
     PROCESSING_ROW_LIMIT = PROCESSING_ROW_LIMIT_CONFIG
 else: 
     PROCESSING_ROW_LIMIT = DEFAULT_PROCESSING_ROW_LIMIT
 
+SIMILAR_DOCUMENTS_LIMIT_CONFIG = config.get("SIMILAR_DOCUMENTS_LIMIT", DEFAULT_SIMILAR_DOCUMENTS_LIMIT)
+if isinstance(SIMILAR_DOCUMENTS_LIMIT_CONFIG, int) and SIMILAR_DOCUMENTS_LIMIT_CONFIG > 1: 
+    SIMILAR_DOCUMENTS_LIMIT = SIMILAR_DOCUMENTS_LIMIT_CONFIG
+else: 
+    SIMILAR_DOCUMENTS_LIMIT = DEFAULT_SIMILAR_DOCUMENTS_LIMIT
+
 
 # --- Application Title ---
 st.title(f"Local Log Analyzer with {LLM_MODEL_NAME.upper()}")
 st.write("Upload your log CSV file, and then ask questions about it!")
+st.write(f"*Keep in mind that we are only retrieving {SIMILAR_DOCUMENTS_LIMIT} documents due to hardware limitations*")
+st.write("Please see the README for more details")
 
 # --- Session State Initialization ---
 # This is crucial for keeping data persistent across user interactions (re-runs).
@@ -108,11 +119,26 @@ def initialize_llama_index(_df: pd.DataFrame, _uploaded_file_name_for_cache_key:
         index = VectorStoreIndex.from_documents(docs, show_progress=True, use_async=False)
         st.write("Finished creating document embeddings. Initializing chat engine.")
 
+        system_prompt = (
+            "You are a helpful assistant for analyzing data from a CSV file. "
+            "You will be given context from one or more rows of the file to answer the user's question. "
+            "Your knowledge is strictly limited to the information provided in the context. "
+            "When asked to count items like 'files' or 'entries', you should count the number of distinct 'Row X:' items you see in the context, not interpret the text within the rows. "
+            "For example, if the context contains the text '*.log', do not assume this refers to actual files; it is just text within a row's data. "
+            "If the answer is not in the context, clearly state that you do not have enough information based on the provided data."
+        )
+        # retriever = index.as_retriever(similarity_top_k=3)
+        # chat_engine = CondensePlusContextChatEngine.from_defaults(
+        #     retriever=retriever, 
+        #     verbose=True
+        # )
         # Create the chat engine 
         # "condense_plus_context" is good for maintaining conversational context with RAG 
         chat_engine = index.as_chat_engine(
             chat_mode="condense_plus_context", # type: ignore
-            verbose=True
+            verbose=True,
+            similarity_top_k=SIMILAR_DOCUMENTS_LIMIT, 
+            system_prompt=system_prompt
         )
         st.write("Chat engine initialized")
         return chat_engine

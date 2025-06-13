@@ -1,7 +1,12 @@
 # ALET Locally Hosted LLMs Workshop 
 This workshop details how to set up a locally hosted Large Language Model for personal use. 
 
-In this particular workshop, we will be leveraging the Llama 4 model to analyze server log files. 
+In this particular workshop, we will be leveraging the Gemma model to analyze server log files. 
+
+First clone the repo by running the following command from a terminal: 
+```
+git clone https://github.com/jdavis-uah/alet-cybercamp.git
+```
 
 _Table of Contents_ 
 1. [Utilized Tools](#utilized-tools)
@@ -80,10 +85,20 @@ docker exec ollama ollama pull gemma3:latest
 
 This will take a few minutes to download most likely. 
 
+**NOTE: If you are on a CPU, it's likely faster to use the Gemma3:1b or TinyLlama model**
+To pull the 1B model from Ollama run the following command from the terminal: 
+```
+docker exec ollama ollama pull gemma3:1b
+```
+
+`1b` here refers to the number of parameters of the model. The baseline Gemma model has 4 billion parameters whereas the 1b model has 1 billion parameters. 
+
 We can also experiment with a much more lightweight model, TinyLlama. This model is designed to fit on less powerful devices and requires less compute. As a tradeoff, it is more prone to generate erroneous responses. To download the TinyLlama model, run the folling command from the terminal: 
 ```
 docker exec ollama ollama pull tinyllama
 ```
+
+**NOTE: If you wish to use Gemma3:1B or TinyLlama, follow the [instructions below](#changing-the-llm-used) to change the LLM used**
 
 ### Running Gemma3
 It is also possible to run Gemma3 from inside the docker container. You simply have to attach to the container and issue the Ollama run command. To do this, run the following commands from the terminal: 
@@ -120,7 +135,7 @@ On upload, the application will embed the contained information. This is a compu
 After the embeddings are computed, an LLM chat engine will be constructed for the uploaded file. You can now begin asking questions about the file and inspect the LLM responses. 
 
 ### Changing the LLM Used 
-By default, the application uses the Gemma3 model for LLM processing. If you are unable to run this model due to performance, open the `config.toml` file and change the `LLM_MODEL_NAME` variable from `"gemma3:latest"` to `"tinyllama"`. 
+By default, the application uses the Gemma3 model for LLM processing. If you are unable to run this model due to performance, open the `config.toml` file and change the `LLM_MODEL_NAME` variable from `"gemma3:latest"` to `"gemma3:1b"` or `"tinyllama"`. 
 
 You will have to rebuild and restart the application after making this change. You can do this by issuing the following commands in the terminal: 
 ```
@@ -137,7 +152,25 @@ docker compose down
 docker compose up --build 
 ```
 
+### Note About Retrieval Augmented Generation
+For this workshop, we are limited by hardware constraints. As such, when you submit a prompt to the model, the retrieval augmented generation (RAG) process only pulls back a limited number of relevant documents from the CSV file. 
+
+These "relevant documents" are retrieved from an in-memory RAG database and their similarity is scored based on the contents of your prompt to the LLM. The term "documents" in this case refers to a vectorized representation of a row in the CSV file you have uploaded. These vectorized representations of the data in your CSV file is compared to a vectorized representation of your prompt to a model, and the top k similar documents are retrieved from the in-memory RAG database and passed to the model alongside your prompt. 
+
+This highlights a limitation of running LLMs locally, unless you have extremely powerful hardware. Since we are resource constrained (compared to Google or OpenAI), we can only retrieve a small amount of relevant information compared to the massive scale at which these companies can retrieve data. As such, you may notice that the generated response does not include the entire set of data. 
+
+### Changing the Number of Relevant Documents Retrieved
+The number of retrieved documents is controlled by the `SIMILAR_DOCUMENTS_LIMIT` variable in the `config.toml` file. By default, the top 10 relevant documents are retrieved when you prompt the model. You can raise or lower the number of retrieved relevant documents by changing the `SIMILAR_DOCUMENTS_LIMIT` variable. Be careful to not set it to high since as the number of similar documents retrieved increases so does the computational complexity of response generation. 
+
+To reflect this change, you will have to rebuild and restart the application with the following commands in the terminal: 
+```
+docker compose down 
+docker compose up --build 
+```
+
 ## Tl;dr Running Instructions 
+Clone the repo: `git clone https://github.com/jdavis-uah/alet-cybercamp.git`
+
 Assuming you have installed Docker Desktop, you can run the following commands to lauch the application. 
 - `docker compose up -d --build`
 - `docker exec ollama ollama pull gemma3:latest`

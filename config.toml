@@ -1,6 +1,12 @@
 # You can set this to any model that you downloaded from Ollama 
-# Gemma3 is the open source Gemini model. "tinyllama" is a great option for resource constrained systems as well. 
+# Gemma3 is the open source Gemini model. "gemma3:1b" or "tinyllama" are great options
+# for resource constrained systems as well. 
 LLM_MODEL_NAME = "gemma3:latest" 
 
 # Change this value to limit the number of rows read in for processing. A value of -1 will read all rows. 
 PROCESSING_ROW_LIMIT = -1
+
+
+# Change this value to increase/decrease the number of similar documents to retrieve when performing 
+# response generation. As the number increases, so does the computational complexity and computing time 
+SIMILAR_DOCUMENTS_LIMIT = 10
