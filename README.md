@@ -46,7 +46,7 @@ Ollama contains a large collection of open-source [vision and language models](h
 ```
 # Run the following commands from a terminal after installing Ollama. 
 # This will download and run the Gemma 3 model. This model is ~3.5GB to download so it may take a minute
-ollama run gemma3:latest
+ollama run gemma3:1b
 ```
 
 ## Starting the Docker Containers
@@ -71,13 +71,28 @@ If you do not see an error in the terminal output, everything is working properl
 docker compose down 
 ```
 
+**Note: If the containers are not running in a detached state:**
+You may have to issue the `ctrl+c` command to gain access back to the terminal and then run the `docker compose down` command to stop the containers.
+
 ## Downloading a LLM from Ollama 
 In order to work with the Streamlit Web Interface, we need to pull a large language model locally. 
 
-For this workshop, we will be using the open-sourced Gemma3 model from Google. This model is fairly lightweight, only around 3.5GB. For comparison the latest, smallest, Llama 4 model (Llama4 Scout) is 65GB. It is likely that Llama 4 will give more accurate outputs but for the purpose of this workshop we will use the smaller model with less parameters. 
+For this workshop, we will be using the open-sourced Gemma3:1b model from Google. This model is fairly lightweight, only around 815MB. For comparison the latest, smallest, Llama 4 model (Llama4 Scout) is 65GB. It is likely that Llama 4 will give more accurate outputs but for the purpose of this workshop we will use the smaller model with less parameters. 
 
 **Note: Be sure your containers are running by executing `docker compose up -d --build` again in the terminal if you stopped them after checking the logs**
 
+To pull the 1B model from Ollama run the following command from the terminal: 
+```
+docker exec ollama ollama pull gemma3:1b
+```
+
+`1b` here refers to the number of parameters of the model. The baseline Gemma model has 4 billion parameters whereas the 1b model has 1 billion parameters.
+
+**NOTE: If you have access to a GPU and a lot of system memory, you can experiment with the Gemma3:latest model.**
+
+We are using the Gemma3:1b model for this workshop because of constrained hardware resources. 
+You may want to experiment with Gemma3:latest, the largest of the Gemma3 models. 
+This model will be more accurate, but will also take longer to process queries. 
 To pull Gemma3 from Ollama so that we can work with it locally, issue the following command from the terminal: 
 ```
 docker exec ollama ollama pull gemma3:latest
@@ -85,27 +100,19 @@ docker exec ollama ollama pull gemma3:latest
 
 This will take a few minutes to download most likely. 
 
-**NOTE: If you are on a CPU, it's likely faster to use the Gemma3:1b or TinyLlama model**
-To pull the 1B model from Ollama run the following command from the terminal: 
-```
-docker exec ollama ollama pull gemma3:1b
-```
-
-`1b` here refers to the number of parameters of the model. The baseline Gemma model has 4 billion parameters whereas the 1b model has 1 billion parameters. 
-
 We can also experiment with a much more lightweight model, TinyLlama. This model is designed to fit on less powerful devices and requires less compute. As a tradeoff, it is more prone to generate erroneous responses. To download the TinyLlama model, run the folling command from the terminal: 
 ```
 docker exec ollama ollama pull tinyllama
 ```
 
-**NOTE: If you wish to use Gemma3:1B or TinyLlama, follow the [instructions below](#changing-the-llm-used) to change the LLM used**
+**NOTE: If you wish to use Gemma3:latest or TinyLlama, follow the [instructions below](#changing-the-llm-used) to change the LLM used**
 
 ### Running Gemma3
 It is also possible to run Gemma3 from inside the docker container. You simply have to attach to the container and issue the Ollama run command. To do this, run the following commands from the terminal: 
 
 ```
 docker exec -it ollama bash 
-ollama run gemma3:latest
+ollama run gemma3:1b
 ```
 
 The first command gives you an interactive terminal in the terminal and runs the bash command. 
@@ -135,7 +142,7 @@ On upload, the application will embed the contained information. This is a compu
 After the embeddings are computed, an LLM chat engine will be constructed for the uploaded file. You can now begin asking questions about the file and inspect the LLM responses. 
 
 ### Changing the LLM Used 
-By default, the application uses the Gemma3 model for LLM processing. If you are unable to run this model due to performance, open the `config.toml` file and change the `LLM_MODEL_NAME` variable from `"gemma3:latest"` to `"gemma3:1b"` or `"tinyllama"`. 
+By default, the application uses the Gemma3:1b model for LLM processing. If you want to experiment with a different model, open the `config.toml` file and change the `LLM_MODEL_NAME` variable from `"gemma3:1b"` to `"gemma3:latest"` or `"tinyllama"`. 
 
 You will have to rebuild and restart the application after making this change. You can do this by issuing the following commands in the terminal: 
 ```
@@ -173,11 +180,28 @@ Clone the repo: `git clone https://github.com/jdavis-uah/alet-cybercamp.git`
 
 Assuming you have installed Docker Desktop, you can run the following commands to lauch the application. 
 - `docker compose up -d --build`
-- `docker exec ollama ollama pull gemma3:latest`
+- `docker exec ollama ollama pull gemma3:1b`
     - This will download the Gemma3 open source Gemini model 
+- `docker exec ollama ollama pull gemma3:latest`
+    - This will download the larger Gemma3 open source Gemini model 
 - `docker exec ollama ollama pull tinyllama`
     - This will download a smaller model you can experiment with 
 - `docker compose down`
 - `docker compose up` 
 - Navigate to `http://localhost:8501` in your browser
 - Upload a CSV file and begin having a conversation with your document 
+
+
+## Known Issues 
+1. In the terminal, the url directs you to http://0.0.0.0:8501. This is verified to work on Mac OSX. For Windows, I have seen it generate errors. If the site doesn't load, use the following URL: http://localhost:8501. 
+2. I have seen issues where the system does not have enough memory to run the Gemma3:latest model. In fact, the Mac used to run the workshop could not run the code using the larger Gemma model. If your chat engine times out and you receive an error message about system memory, use a smaller model: `gemma3:1b` or `tinyllama`. 
+3. If the application runs extremely slow, it is likely due to the number of documents used for retrieval or the size of the CSV file.
+    1. If the application's chat engine takes an extremely long time to open up, it's likely the size of the CSV file being used. You can either use a smaller CSV file, or limit the number of rows loaded by the application. To limit the number of rows, open the `config.toml` file and change the `PROCESSING_ROW_LIMIT` variable from `-1` (load all rows) to a reasonable number. 
+    2. If the application's chat engine is taking an extremely long time to generate a response, it is likely one of two things: the model used or the number of similar documents being loaded. You can experiment with changing both of these in the `config.toml` file as well. To change the model used to the smallest model, change the `LLM_MODEL_NAME` in `config.toml` to `tinyllama`. To change the number of similar documents loaded during a query (see the [description of RAG](#note-about-retrieval-augmented-generation)), change the `SIMILAR_DOCUMENTS_LIMIT` from `10` to a much lower value. 
+
+**NOTE: If you change any of these values, you will need to stop the application and restart it.**
+To stop the application and restart it, run the following commands from the terminal: 
+```
+docker compose down 
+docker compose up 
+```
